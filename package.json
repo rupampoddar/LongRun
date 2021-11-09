@@ -1,5 +1,28 @@
 {
-  "dependencies": {
-    "@types/google-apps-script": "^1.0.37"
-  }
+  "name": "gas-longrun",
+  "description": "the LongRun class supports to execute long-running Google Apps Scripts. (A spin-off from [GAS-Terminal](https://github.com/inclu-cat/GAS-Terminal))",
+  "version": "1.0.0",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "devDependencies": {
+    "@types/google-apps-script": "^1.0.39",
+    "typescript": "^4.4.4"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rupampoddar/LongRun.git"
+  },
+  "keywords": [],
+  "author": "inclu-cat",
+  "contributors": [
+    "Rupam Poddar <rupam.poddar@protonmail.com>"
+  ],
+  "bugs": {
+    "url": "https://github.com/rupampoddar/LongRun/issues"
+  },
+  "homepage": "https://github.com/rupampoddar/LongRun#readme"
 }

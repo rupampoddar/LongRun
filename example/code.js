@@ -1,4 +1,4 @@
-import {LongRun} from "./LongRun";
+import {LongRun} from "../lib/index";
 
 function executeTest() {
   const params = [];
