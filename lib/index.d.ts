@@ -1,3 +1,8 @@
+/// <reference types="google-apps-script" />
+/**
+ * Long-Running Support
+ */
+import Properties = GoogleAppsScript.Properties.Properties;
 export declare class LongRun {
     private static _instance;
     static PREFIX_RUNNING: string;
@@ -6,6 +11,7 @@ export declare class LongRun {
     static PREFIX_OPTION: string;
     static RUNNING_MAX_SECONDS: number;
     static RUNNING_DELAY_MINUTES: number;
+    properties: Properties;
     /**
      * Private constructor
      * @private

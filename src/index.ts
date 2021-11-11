@@ -15,11 +15,25 @@ export class LongRun {
   static RUNNING_MAX_SECONDS: number = 4 * 60;
   static RUNNING_DELAY_MINUTES: number = 1;
 
+  properties: Properties;
+
   /**
    * Private constructor
    * @private
    */
-  private constructor() {}
+  private constructor(scope: string | null = null) {
+    switch (scope) {
+      case 'script':
+        this.properties = PropertiesService.getScriptProperties();
+        break;
+      case 'document':
+        this.properties = PropertiesService.getDocumentProperties();
+        break;
+      default:
+        this.properties = PropertiesService.getUserProperties();
+        break;
+    }
+  }
 
   /**
    * Returns singleton instance.
@@ -39,9 +53,7 @@ export class LongRun {
    * @param funcName
    */
   isRunning(funcName: string): boolean {
-    // get spreadsheet properties
-    let properties: Properties = PropertiesService.getScriptProperties();
-    let running: string | null = properties.getProperty(
+    let running: string | null = this.properties.getProperty(
       LongRun.PREFIX_RUNNING + funcName
     );
     return !(running == null || running === '');
@@ -53,12 +65,11 @@ export class LongRun {
    * @param running
    */
   setRunning(funcName: string, running: boolean): void {
-    let properties: Properties = PropertiesService.getScriptProperties();
     const key = LongRun.PREFIX_RUNNING + funcName;
     if (running) {
-      properties.setProperty(key, 'running');
+      this.properties.setProperty(key, 'running');
     } else {
-      properties.deleteProperty(key);
+      this.properties.deleteProperty(key);
     }
   }
 
@@ -82,8 +93,9 @@ export class LongRun {
    * @param funcName
    */
   getParameters(funcName: string): string[] {
-    let properties: Properties = PropertiesService.getScriptProperties();
-    let parameters = properties.getProperty(LongRun.PREFIX_OPTION + funcName);
+    let parameters = this.properties.getProperty(
+      LongRun.PREFIX_OPTION + funcName
+    );
     if (parameters != null) {
       return parameters.split(',');
     } else {
@@ -96,14 +108,13 @@ export class LongRun {
    * @param parameters
    */
   setParameters(funcName: string, parameters: string[]): void {
-    let properties: Properties = PropertiesService.getScriptProperties();
     if (parameters != null) {
-      properties.setProperty(
+      this.properties.setProperty(
         LongRun.PREFIX_OPTION + funcName,
         parameters.join(',')
       );
     } else {
-      properties.deleteProperty(LongRun.PREFIX_OPTION + funcName);
+      this.properties.deleteProperty(LongRun.PREFIX_OPTION + funcName);
     }
   }
 
@@ -115,9 +126,6 @@ export class LongRun {
     // save start time
     this.startTimeMap[funcName] = new Date().getTime();
 
-    // get properties of spreadsheet
-    let properties: Properties = PropertiesService.getScriptProperties();
-
     // set running-flag
     this.setRunning(funcName, true);
 
@@ -126,7 +134,7 @@ export class LongRun {
 
     // get start index
     let startPos: number = parseInt(
-      properties.getProperty(LongRun.PREFIX_START_POS + funcName) || '0'
+      this.properties.getProperty(LongRun.PREFIX_START_POS + funcName) || '0'
     );
     if (!startPos) {
       return 0;
@@ -163,12 +171,10 @@ export class LongRun {
   reset(funcName: string): void {
     // delete trigger
     this.deleteTrigger(LongRun.PREFIX_TRIGGER_KEY + funcName);
-    // delete spreadsheet properties
-    let properties: Properties = PropertiesService.getScriptProperties();
-    properties.deleteProperty(LongRun.PREFIX_START_POS + funcName);
-    properties.deleteProperty(LongRun.PREFIX_OPTION + funcName);
-    properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
-    properties.deleteProperty(LongRun.PREFIX_TRIGGER_KEY + funcName);
+    this.properties.deleteProperty(LongRun.PREFIX_START_POS + funcName);
+    this.properties.deleteProperty(LongRun.PREFIX_OPTION + funcName);
+    this.properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
+    this.properties.deleteProperty(LongRun.PREFIX_TRIGGER_KEY + funcName);
   }
 
   /**
@@ -190,7 +196,7 @@ export class LongRun {
    * @param funcName
    */
   existsNextTrigger(funcName: string): boolean {
-    let triggerId = PropertiesService.getScriptProperties().getProperty(
+    let triggerId = this.properties.getProperty(
       LongRun.PREFIX_TRIGGER_KEY + funcName
     );
     return triggerId != null;
@@ -202,16 +208,14 @@ export class LongRun {
    * @param nextIndex - start position when resuming
    */
   registerNextTrigger(funcName: string, nextIndex: number): void {
-    // get spreadsheet properties
-    let properties: Properties = PropertiesService.getScriptProperties();
-    properties.setProperty(
+    this.properties.setProperty(
       LongRun.PREFIX_START_POS + funcName,
       String(nextIndex)
     ); // save next start position
     this.setTrigger(LongRun.PREFIX_TRIGGER_KEY + funcName, funcName); // set trigger
 
     // turn off running-flag
-    properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
+    this.properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
   }
 
   /**
@@ -219,8 +223,7 @@ export class LongRun {
    * @param triggerKey
    */
   private deleteTrigger(triggerKey: string): void {
-    let triggerId =
-      PropertiesService.getScriptProperties().getProperty(triggerKey);
+    let triggerId = this.properties.getProperty(triggerKey);
 
     if (!triggerId) return;
 
@@ -231,7 +234,7 @@ export class LongRun {
       .forEach(function (trigger) {
         ScriptApp.deleteTrigger(trigger);
       });
-    PropertiesService.getScriptProperties().deleteProperty(triggerKey);
+    this.properties.deleteProperty(triggerKey);
   }
 
   /**
@@ -249,6 +252,6 @@ export class LongRun {
       .create()
       .getUniqueId();
     // save the trigger id to delete the trigger later.
-    PropertiesService.getScriptProperties().setProperty(triggerKey, triggerId);
+    this.properties.setProperty(triggerKey, triggerId);
   }
 }
