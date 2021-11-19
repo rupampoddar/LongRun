@@ -1,10 +1,14 @@
 declare type EveryMinutesType = 1 | 5 | 10 | 15 | 30;
-declare type ExecScopeType = "user" | "script" | "document";
+declare type ExecScopeType = 'user' | 'script' | 'document';
 export declare type SetupOptions = {
+    isAddon: boolean;
     execScope: ExecScopeType;
     taskCount: number;
     maxRuntime: number;
-    triggerEveryNMinutes: EveryMinutesType;
+    triggerEveryNMinutes: EveryMinutesType | null;
+    triggerEveryNHours: number | null;
+    triggerEveryNDays: number | null;
+    triggerEveryNWeeks: number | null;
 };
 export declare class LongRun {
     private static _instance;
@@ -13,10 +17,14 @@ export declare class LongRun {
     static PREFIX_START_POS: string;
     static PREFIX_CURRENT_POS: string;
     static PREFIX_OPTION: string;
+    static PREFIX_OPTION_IS_ADDON: string;
     static PREFIX_OPTION_EXEC_SCOPE: string;
     static PREFIX_OPTION_TASK_COUNT: string;
     static PREFIX_OPTION_MAX_RUNTIME: string;
     static PREFIX_OPTION_TRIGGER_EVERY_N_MINS: string;
+    static PREFIX_OPTION_TRIGGER_EVERY_N_HOURS: string;
+    static PREFIX_OPTION_TRIGGER_EVERY_N_DAYS: string;
+    static PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS: string;
     static PREFIX_FUNC_ARGS: string;
     static PREFIX_TASK_COUNT: string;
     static PREFIX_TASK_COMPLETED_INDEX: string;
@@ -34,12 +42,14 @@ export declare class LongRun {
      * Returns singleton instance.
      */
     static get instance(): LongRun;
-    setup(funcName: string, options: SetupOptions, funcArgs?: any[]): void;
     /**
+     * Prepares the long running function
      *
-     *
-     * @returns start index ( 0 for the first time )
+     * @param funcName Long running function name
+     * @param options Setup options
+     * @param funcArgs Arguments for the long running function
      */
+    setup(funcName: string, options: SetupOptions, funcArgs?: any[]): void;
     /**
      * This function is to be called from the long running function.
      * It returns the index from where the loop needs to be started.
@@ -56,6 +66,12 @@ export declare class LongRun {
      * @return true - it should be suspended
      */
     checkShouldSuspend(funcName: string, currentIndex: number): boolean;
+    /**
+     * Marks the task as completed
+     *
+     * @param funcName Long running function name
+     * @param index Task index (loop index)
+     */
     setTaskCompleted(funcName: string, index: number): void;
     /**
      * Resets Long-Running variables if there is no next trigger.
@@ -102,27 +118,10 @@ export declare class LongRun {
      */
     setParameters(funcName: string, parameters: string[]): void;
     /**
-     * Returns if there is next trigger.
-     * @param funcName
-     */
-    existsNextTrigger(funcName: string): boolean;
-    /**
-     * register the next trigger and set running-flag off
-     * @param funcName
-     * @param nextIndex - start position when resuming
-     */
-    registerNextTrigger(funcName: string, nextIndex: number): void;
-    /**
-     * Deletes the trigger
+     * Deletes the trigger at the end
      *
      * @param triggerKey
      */
     private deleteTrigger;
-    /**
-     * Sets a trigger
-     * @param triggerKey
-     * @param funcName
-     */
-    private setTrigger;
 }
 export {};

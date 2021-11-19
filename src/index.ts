@@ -1,47 +1,50 @@
 import Properties = GoogleAppsScript.Properties.Properties;
 
 type EveryMinutesType = 1 | 5 | 10 | 15 | 30;
-type ExecScopeType = "user" | "script" | "document";
+type ExecScopeType = 'user' | 'script' | 'document';
+type ScriptType = 'addon' | 'containerBound' | 'webapp';
 
 export type SetupOptions = {
+  isAddon: boolean;
   execScope: ExecScopeType;
   taskCount: number;
   maxRuntime: number;
-  triggerEveryNMinutes: EveryMinutesType;
+  triggerEveryNMinutes: EveryMinutesType | null;
+  triggerEveryNHours: number | null;
+  triggerEveryNDays: number | null;
+  triggerEveryNWeeks: number | null;
 };
-class GasTrigger {
-  constructor(functionName: string, everyMinutes: EveryMinutesType) {
-    //
-    // https://developers.google.com/apps-script/reference/script/clock-trigger-builder#everyminutesn
-    return ScriptApp.newTrigger(functionName)
-      .timeBased()
-      .everyMinutes(everyMinutes) // trigger every n minutes. n must be 1, 5, 10, 15 or 30.
-      .create();
-  }
-}
 
 export class LongRun {
   // singleton instance
   private static _instance: LongRun;
 
   // constants
-  static PREFIX_RUNNING: string = "running_"; // in use
-  static PREFIX_TRIGGER_ID: string = "trigger_"; // in use
-  static PREFIX_START_POS: string = "start_";
-  static PREFIX_CURRENT_POS: string = "current_";
-  static PREFIX_OPTION: string = "option_";
+  static PREFIX_RUNNING: string = 'running_'; // in use
+  static PREFIX_TRIGGER_ID: string = 'trigger_'; // in use
+  static PREFIX_START_POS: string = 'start_';
+  static PREFIX_CURRENT_POS: string = 'current_';
+  static PREFIX_OPTION: string = 'option_';
 
   // in use
-  static PREFIX_OPTION_EXEC_SCOPE: string = "option_exec_scope_";
-  static PREFIX_OPTION_TASK_COUNT: string = "option_task_count_";
-  static PREFIX_OPTION_MAX_RUNTIME: string = "option_MAX_RUNTIME_";
-  static PREFIX_OPTION_TRIGGER_EVERY_N_MINS: string = "option_trigger_every_n_minutes_";
+  static PREFIX_OPTION_IS_ADDON: string = 'option_is_addon';
+  static PREFIX_OPTION_EXEC_SCOPE: string = 'option_exec_scope_';
+  static PREFIX_OPTION_TASK_COUNT: string = 'option_task_count_';
+  static PREFIX_OPTION_MAX_RUNTIME: string = 'option_MAX_RUNTIME_';
+  static PREFIX_OPTION_TRIGGER_EVERY_N_MINS: string =
+    'option_trigger_every_n_minutes_';
+  static PREFIX_OPTION_TRIGGER_EVERY_N_HOURS: string =
+    'option_trigger_every_n_hours_';
+  static PREFIX_OPTION_TRIGGER_EVERY_N_DAYS: string =
+    'option_trigger_every_n_days_';
+  static PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS: string =
+    'option_trigger_every_n_weeks_';
 
-  static PREFIX_FUNC_ARGS: string = "args_"; // in use
+  static PREFIX_FUNC_ARGS: string = 'args_'; // in use
 
-  static PREFIX_TASK_COUNT: string = "task_count_";
+  static PREFIX_TASK_COUNT: string = 'task_count_';
 
-  static PREFIX_TASK_COMPLETED_INDEX: string = "task_completed_index_"; // in use
+  static PREFIX_TASK_COMPLETED_INDEX: string = 'task_completed_index_'; // in use
 
   static RUNNING_MAX_SECONDS: number = 4 * 60;
   static RUNNING_DELAY_MINUTES: number = 1;
@@ -68,12 +71,23 @@ export class LongRun {
     return this._instance;
   }
 
+  /**
+   * Prepares the long running function
+   *
+   * @param funcName Long running function name
+   * @param options Setup options
+   * @param funcArgs Arguments for the long running function
+   */
   setup(funcName: string, options: SetupOptions, funcArgs: any[] = []) {
     const {
-      execScope,
+      isAddon, // whether it's used in an addon or not
+      execScope, // scope for properties service (only "user" is implemented currently)
       taskCount, // total task count (i.e. loop count)
-      maxRuntime, // maximum acceptable run time in seconds
-      triggerEveryNMinutes, // trigger the long running function every n minutes
+      maxRuntime, // maximum acceptable run time of the long-running function in seconds
+      triggerEveryNMinutes, // trigger the long-running function every n minutes
+      triggerEveryNHours, // trigger the long-running function every n hours
+      triggerEveryNDays, // trigger the long-running function every n days
+      triggerEveryNWeeks, // trigger the long-running function every n weeks
     } = options;
 
     // if (execScope === 'script') {
@@ -84,30 +98,69 @@ export class LongRun {
     //   this.properties = PropertiesService.getUserProperties();
     // }
 
-    // https://developers.google.com/apps-script/reference/script/clock-trigger-builder#everyminutesn
-    const triggerId = ScriptApp.newTrigger(funcName)
-      .timeBased()
-      .everyMinutes(triggerEveryNMinutes) // trigger every n minutes. n must be 1, 5, 10, 15 or 30.
-      .create()
-      .getUniqueId();
+    let triggerId: string | null = null;
+    let triggerProperties: any = null;
+    const clockTriggerBuilder: GoogleAppsScript.Script.ClockTriggerBuilder =
+      ScriptApp.newTrigger(funcName).timeBased();
+    // add-on can use a time-driven trigger once per hour at most,
+    // hence, triggerEveryNMinutes is not applicable.
+    if (!isAddon && triggerEveryNMinutes !== null) {
+      triggerId = clockTriggerBuilder
+        .everyMinutes(triggerEveryNMinutes)
+        .create()
+        .getUniqueId();
+      triggerProperties = {
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS]: triggerEveryNMinutes,
+      };
+    } else if (triggerEveryNHours) {
+      triggerId = clockTriggerBuilder
+        .everyHours(triggerEveryNHours)
+        .create()
+        .getUniqueId();
+      triggerProperties = {
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS]: triggerEveryNHours,
+      };
+    } else if (triggerEveryNDays) {
+      triggerId = clockTriggerBuilder
+        .everyDays(triggerEveryNDays)
+        .create()
+        .getUniqueId();
+      triggerProperties = {
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS]: triggerEveryNDays,
+      };
+    } else if (triggerEveryNWeeks) {
+      triggerId = clockTriggerBuilder
+        .everyWeeks(triggerEveryNWeeks)
+        .create()
+        .getUniqueId();
+      triggerProperties = {
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS]: triggerEveryNWeeks,
+      };
+    }
 
-    // set properties in batch.
-    // (using es2015 computed property names)
-    this.properties.setProperties({
-      [LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName]: execScope,
-      [LongRun.PREFIX_OPTION_TASK_COUNT + funcName]: String(taskCount),
-      [LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName]: String(maxRuntime),
-      [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName]: String(triggerEveryNMinutes),
-      [LongRun.PREFIX_FUNC_ARGS + funcName]: JSON.stringify(funcArgs),
-      [LongRun.PREFIX_TRIGGER_ID + funcName]: triggerId,
-    });
+    if (triggerId !== null) {
+      // set properties in batch.
+      // (using es2015 computed property names)
+      let properties = {
+        [LongRun.PREFIX_OPTION_IS_ADDON]: String(isAddon),
+        [LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName]: execScope,
+        [LongRun.PREFIX_OPTION_TASK_COUNT + funcName]: String(taskCount),
+        [LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName]: String(maxRuntime),
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName]:
+          String(triggerEveryNMinutes),
+        [LongRun.PREFIX_FUNC_ARGS + funcName]: JSON.stringify(funcArgs),
+        [LongRun.PREFIX_TRIGGER_ID + funcName]: triggerId,
+      };
+      if (triggerProperties !== null) {
+        properties = { ...properties, ...triggerProperties };
+        this.properties.setProperties(properties);
+      } else {
+        throw new Error('setup failed, trigger recurrence missing.');
+      }
+    } else {
+      throw new Error('setup failed');
+    }
   }
-
-  /**
-   *
-   *
-   * @returns start index ( 0 for the first time )
-   */
 
   /**
    * This function is to be called from the long running function.
@@ -127,14 +180,14 @@ export class LongRun {
     // this.deleteTrigger(LongRun.PREFIX_TRIGGER_KEY + funcName);
 
     // calculate start index
-    let lastCompletedProcessIndex: number | string | null = this.properties.getProperty(
-      LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
-    );
+    let lastCompletedProcessIndex: number | string | null =
+      this.properties.getProperty(
+        LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
+      );
     if (lastCompletedProcessIndex !== null) {
       return parseInt(lastCompletedProcessIndex) + 1;
-    } else {
-      return 0;
     }
+    return 0;
   }
 
   /**
@@ -175,8 +228,17 @@ export class LongRun {
     }
   }
 
+  /**
+   * Marks the task as completed
+   *
+   * @param funcName Long running function name
+   * @param index Task index (loop index)
+   */
   setTaskCompleted(funcName: string, index: number): void {
-    this.properties.setProperty(LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName, String(index));
+    this.properties.setProperty(
+      LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName,
+      String(index)
+    );
   }
 
   /**
@@ -192,7 +254,9 @@ export class LongRun {
     // }
     // return ret;
     // check if all the processes are completed
-    const taskCount = this.properties.getProperty(LongRun.PREFIX_OPTION_TASK_COUNT + funcName);
+    const taskCount = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TASK_COUNT + funcName
+    );
     const completedTaskIndex = this.properties.getProperty(
       LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
     );
@@ -210,18 +274,35 @@ export class LongRun {
    * @param funcName
    */
   reset(funcName: string): void {
-    // delete trigger
+    // delete trigger id from properties
     this.deleteTrigger(LongRun.PREFIX_TRIGGER_ID + funcName);
 
-    // delete properties
+    // delete setup options from properties
+    this.properties.deleteProperty(LongRun.PREFIX_OPTION_IS_ADDON + funcName);
     this.properties.deleteProperty(LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName);
     this.properties.deleteProperty(LongRun.PREFIX_OPTION_TASK_COUNT + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_FUNC_ARGS+funcName)
-    this.properties.deleteProperty(LongRun.PREFIX_TASK_COMPLETED_INDEX+funcName)
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS + funcName
+    );
+
+    // delete function arguments from properties
+    this.properties.deleteProperty(LongRun.PREFIX_FUNC_ARGS + funcName);
+    this.properties.deleteProperty(
+      LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
+    );
     this.properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_TRIGGER_ID + funcName);
   }
 
   /**
@@ -229,8 +310,10 @@ export class LongRun {
    * @param funcName
    */
   isRunning(funcName: string): boolean {
-    let running: string | null = this.properties.getProperty(LongRun.PREFIX_RUNNING + funcName);
-    return !(running == null || running === "");
+    let running: string | null = this.properties.getProperty(
+      LongRun.PREFIX_RUNNING + funcName
+    );
+    return !(running == null || running === '');
   }
 
   /**
@@ -242,7 +325,7 @@ export class LongRun {
   setRunning(funcName: string, isRunning: boolean): void {
     const key = LongRun.PREFIX_RUNNING + funcName;
     if (isRunning) {
-      this.properties.setProperty(key, "running");
+      this.properties.setProperty(key, 'running');
     } else {
       this.properties.deleteProperty(key);
     }
@@ -274,11 +357,29 @@ export class LongRun {
     // } else {
     //   return [];
     // }
-    const execScope = this.properties.getProperty(LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName);
-    const taskCount = this.properties.getProperty(LongRun.PREFIX_OPTION_TASK_COUNT + funcName);
-    const maxRuntime = this.properties.getProperty(LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName);
+    const isAddon = Boolean(
+      this.properties.getProperty(LongRun.PREFIX_OPTION_IS_ADDON + funcName)
+    );
+    const execScope = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName
+    );
+    const taskCount = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TASK_COUNT + funcName
+    );
+    const maxRuntime = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName
+    );
     const triggerEveryNMinutes = this.properties.getProperty(
       LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName
+    );
+    const triggerEveryNHours = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS + funcName
+    );
+    const triggerEveryNDays = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS + funcName
+    );
+    const triggerEveryNWeeks = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS + funcName
     );
     if (
       execScope !== null &&
@@ -287,10 +388,20 @@ export class LongRun {
       triggerEveryNMinutes !== null
     ) {
       return {
+        isAddon: isAddon,
         execScope: execScope as ExecScopeType,
         taskCount: parseInt(taskCount),
         maxRuntime: parseInt(maxRuntime),
-        triggerEveryNMinutes: parseInt(triggerEveryNMinutes) as EveryMinutesType,
+        triggerEveryNMinutes:
+          triggerEveryNMinutes === null
+            ? null
+            : (parseInt(triggerEveryNMinutes) as EveryMinutesType),
+        triggerEveryNHours:
+          triggerEveryNHours === null ? null : parseInt(triggerEveryNHours),
+        triggerEveryNDays:
+          triggerEveryNDays === null ? null : parseInt(triggerEveryNDays),
+        triggerEveryNWeeks:
+          triggerEveryNWeeks === null ? null : parseInt(triggerEveryNWeeks),
       };
     }
     return null;
@@ -302,36 +413,17 @@ export class LongRun {
    */
   setParameters(funcName: string, parameters: string[]): void {
     if (parameters != null) {
-      this.properties.setProperty(LongRun.PREFIX_OPTION + funcName, parameters.join(","));
+      this.properties.setProperty(
+        LongRun.PREFIX_OPTION + funcName,
+        parameters.join(',')
+      );
     } else {
       this.properties.deleteProperty(LongRun.PREFIX_OPTION + funcName);
     }
   }
 
   /**
-   * Returns if there is next trigger.
-   * @param funcName
-   */
-  existsNextTrigger(funcName: string): boolean {
-    let triggerId = this.properties.getProperty(LongRun.PREFIX_TRIGGER_ID + funcName);
-    return triggerId != null;
-  }
-
-  /**
-   * register the next trigger and set running-flag off
-   * @param funcName
-   * @param nextIndex - start position when resuming
-   */
-  registerNextTrigger(funcName: string, nextIndex: number): void {
-    this.properties.setProperty(LongRun.PREFIX_START_POS + funcName, String(nextIndex)); // save next start position
-    this.setTrigger(LongRun.PREFIX_TRIGGER_ID + funcName, funcName); // set trigger
-
-    // turn off running-flag
-    this.properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
-  }
-
-  /**
-   * Deletes the trigger
+   * Deletes the trigger at the end
    *
    * @param triggerKey
    */
@@ -340,7 +432,7 @@ export class LongRun {
 
     if (!triggerId) return;
 
-    console.log(ScriptApp.getProjectTriggers())
+    console.log(ScriptApp.getProjectTriggers());
     // get the function execution scope
     // const execScope = this.properties.getProperty;
     ScriptApp.getProjectTriggers()
@@ -351,21 +443,5 @@ export class LongRun {
         ScriptApp.deleteTrigger(trigger);
       });
     this.properties.deleteProperty(triggerKey);
-
-
-  }
-
-  /**
-   * Sets a trigger
-   * @param triggerKey
-   * @param funcName
-   */
-  private setTrigger(triggerKey: string, funcName: string) {
-    this.deleteTrigger(triggerKey); // delete if exists.
-    let dt: Date = new Date();
-    dt.setMinutes(dt.getMinutes() + LongRun.RUNNING_DELAY_MINUTES); // will execute after the specified time
-    let triggerId = ScriptApp.newTrigger(funcName).timeBased().at(dt).create().getUniqueId();
-    // save the trigger id to delete the trigger later.
-    this.properties.setProperty(triggerKey, triggerId);
   }
 }
