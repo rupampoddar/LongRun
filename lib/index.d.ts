@@ -1,5 +1,5 @@
 declare type EveryMinutesType = 1 | 5 | 10 | 15 | 30;
-declare type ExecScopeType = 'user' | 'script' | 'document';
+declare type ExecScopeType = "user" | "script" | "document";
 export declare type SetupOptions = {
     isAddon: boolean;
     execScope: ExecScopeType;
@@ -14,8 +14,6 @@ export declare class LongRun {
     private static _instance;
     static PREFIX_RUNNING: string;
     static PREFIX_TRIGGER_ID: string;
-    static PREFIX_START_POS: string;
-    static PREFIX_CURRENT_POS: string;
     static PREFIX_OPTION: string;
     static PREFIX_OPTION_IS_ADDON: string;
     static PREFIX_OPTION_EXEC_SCOPE: string;
@@ -26,7 +24,6 @@ export declare class LongRun {
     static PREFIX_OPTION_TRIGGER_EVERY_N_DAYS: string;
     static PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS: string;
     static PREFIX_FUNC_ARGS: string;
-    static PREFIX_TASK_COUNT: string;
     static PREFIX_TASK_COMPLETED_INDEX: string;
     static RUNNING_MAX_SECONDS: number;
     static RUNNING_DELAY_MINUTES: number;
@@ -61,9 +58,9 @@ export declare class LongRun {
     /**
      * Determines whether the process should be suspended based on elapsed time.
      *
-     * @param funcName
+     * @param funcName The long running function name
      * @param currentIndex - start position when resuming
-     * @return true - it should be suspended
+     * @return boolean
      */
     checkShouldSuspend(funcName: string, currentIndex: number): boolean;
     /**
