@@ -1,14 +1,16 @@
 declare type EveryMinutesType = 1 | 5 | 10 | 15 | 30;
 declare type ExecScopeType = "user" | "script" | "document";
 export declare type SetupOptions = {
+    applyV8Workaround?: boolean;
+    webappUrl?: string;
     isAddon: boolean;
     execScope: ExecScopeType;
     taskCount: number;
     maxRuntime: number;
-    triggerEveryNMinutes: EveryMinutesType | null;
-    triggerEveryNHours: number | null;
-    triggerEveryNDays: number | null;
-    triggerEveryNWeeks: number | null;
+    triggerEveryNMinutes?: EveryMinutesType;
+    triggerEveryNHours?: number;
+    triggerEveryNDays?: number;
+    triggerEveryNWeeks?: number;
 };
 export declare class LongRun {
     private static _instance;

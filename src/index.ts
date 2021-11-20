@@ -5,14 +5,16 @@ type ExecScopeType = "user" | "script" | "document";
 type ScriptType = "addon" | "containerBound" | "webapp";
 
 export type SetupOptions = {
+  applyV8Workaround?: boolean;
+  webappUrl?: string;
   isAddon: boolean;
   execScope: ExecScopeType;
   taskCount: number;
   maxRuntime: number;
-  triggerEveryNMinutes: EveryMinutesType | null;
-  triggerEveryNHours: number | null;
-  triggerEveryNDays: number | null;
-  triggerEveryNWeeks: number | null;
+  triggerEveryNMinutes?: EveryMinutesType;
+  triggerEveryNHours?: number;
+  triggerEveryNDays?: number;
+  triggerEveryNWeeks?: number;
 };
 
 export class LongRun {
@@ -28,10 +30,14 @@ export class LongRun {
   static PREFIX_OPTION_EXEC_SCOPE: string = "option_exec_scope_";
   static PREFIX_OPTION_TASK_COUNT: string = "option_task_count_";
   static PREFIX_OPTION_MAX_RUNTIME: string = "option_MAX_RUNTIME_";
-  static PREFIX_OPTION_TRIGGER_EVERY_N_MINS: string = "option_trigger_every_n_minutes_";
-  static PREFIX_OPTION_TRIGGER_EVERY_N_HOURS: string = "option_trigger_every_n_hours_";
-  static PREFIX_OPTION_TRIGGER_EVERY_N_DAYS: string = "option_trigger_every_n_days_";
-  static PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS: string = "option_trigger_every_n_weeks_";
+  static PREFIX_OPTION_TRIGGER_EVERY_N_MINS: string =
+    "option_trigger_every_n_minutes_";
+  static PREFIX_OPTION_TRIGGER_EVERY_N_HOURS: string =
+    "option_trigger_every_n_hours_";
+  static PREFIX_OPTION_TRIGGER_EVERY_N_DAYS: string =
+    "option_trigger_every_n_days_";
+  static PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS: string =
+    "option_trigger_every_n_weeks_";
 
   static PREFIX_FUNC_ARGS: string = "args_";
   static PREFIX_TASK_COMPLETED_INDEX: string = "task_completed_index_";
@@ -89,33 +95,72 @@ export class LongRun {
     // }
 
     // reset any previous execution
-    this.reset(funcName)
+    this.reset(funcName);
 
     let triggerId: string | null = null;
     let triggerProperties: any = null;
-    const clockTriggerBuilder: GoogleAppsScript.Script.ClockTriggerBuilder =
-      ScriptApp.newTrigger(funcName).timeBased();
-    // add-on can use a time-driven trigger once per hour at most,
-    // hence, triggerEveryNMinutes is not applicable.
-    if (!isAddon && triggerEveryNMinutes !== null) {
-      triggerId = clockTriggerBuilder.everyMinutes(triggerEveryNMinutes).create().getUniqueId();
-      triggerProperties = {
-        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName]: triggerEveryNMinutes,
+
+    if (options.applyV8Workaround && options.webappUrl) {
+      const params = {
+        headers: { Authorization: `Bearer ${ScriptApp.getOAuthToken()}` },
+        followRedirects: true,
+        muteHttpExceptions: true,
       };
-    } else if (triggerEveryNHours) {
-      triggerId = clockTriggerBuilder.everyHours(triggerEveryNHours).create().getUniqueId();
+      const url = `${options.webappUrl}?fn=${funcName}`;
+      const response = UrlFetchApp.fetch(url, params).getContentText();
+      const responseJSON = JSON.parse(response);
+      if (responseJSON.status === "success") {
+        triggerId = responseJSON.triggerId;
+      } else if (responseJSON.status === "error") {
+        throw new Error(`${responseJSON.message}`);
+      }
+    } else {
+      const clockTriggerBuilder: GoogleAppsScript.Script.ClockTriggerBuilder =
+        ScriptApp.newTrigger(funcName).timeBased();
+      // add-on can use a time-driven trigger once per hour at most,
+      // hence, triggerEveryNMinutes is not applicable.
+      if (!isAddon && triggerEveryNMinutes) {
+        triggerId = clockTriggerBuilder
+          .everyMinutes(triggerEveryNMinutes)
+          .create()
+          .getUniqueId();
+      } else if (triggerEveryNHours) {
+        triggerId = clockTriggerBuilder
+          .everyHours(triggerEveryNHours)
+          .create()
+          .getUniqueId();
+      } else if (triggerEveryNDays) {
+        triggerId = clockTriggerBuilder
+          .everyDays(triggerEveryNDays)
+          .create()
+          .getUniqueId();
+      } else if (triggerEveryNWeeks) {
+        triggerId = clockTriggerBuilder
+          .everyWeeks(triggerEveryNWeeks)
+          .create()
+          .getUniqueId();
+      }
+    }
+
+    if (!isAddon && options.triggerEveryNMinutes) {
       triggerProperties = {
-        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS + funcName]: triggerEveryNHours,
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName]:
+          triggerEveryNMinutes,
       };
-    } else if (triggerEveryNDays) {
-      triggerId = clockTriggerBuilder.everyDays(triggerEveryNDays).create().getUniqueId();
+    } else if (options.triggerEveryNHours) {
       triggerProperties = {
-        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS + funcName]: triggerEveryNDays,
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS + funcName]:
+          triggerEveryNHours,
       };
-    } else if (triggerEveryNWeeks) {
-      triggerId = clockTriggerBuilder.everyWeeks(triggerEveryNWeeks).create().getUniqueId();
+    } else if (options.triggerEveryNDays) {
       triggerProperties = {
-        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS + funcName]: triggerEveryNWeeks,
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS + funcName]:
+          triggerEveryNDays,
+      };
+    } else if (options.triggerEveryNWeeks) {
+      triggerProperties = {
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS + funcName]:
+          triggerEveryNWeeks,
       };
     }
 
@@ -127,7 +172,8 @@ export class LongRun {
         [LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName]: execScope,
         [LongRun.PREFIX_OPTION_TASK_COUNT + funcName]: String(taskCount),
         [LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName]: String(maxRuntime),
-        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName]: String(triggerEveryNMinutes),
+        [LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName]:
+          String(triggerEveryNMinutes),
         [LongRun.PREFIX_FUNC_ARGS + funcName]: JSON.stringify(funcArgs),
         [LongRun.PREFIX_TRIGGER_ID + funcName]: triggerId,
       };
@@ -160,9 +206,10 @@ export class LongRun {
     // this.deleteTrigger(LongRun.PREFIX_TRIGGER_KEY + funcName);
 
     // calculate start index
-    let lastCompletedProcessIndex: number | string | null = this.properties.getProperty(
-      LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
-    );
+    let lastCompletedProcessIndex: number | string | null =
+      this.properties.getProperty(
+        LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
+      );
     if (lastCompletedProcessIndex !== null) {
       return parseInt(lastCompletedProcessIndex) + 1;
     }
@@ -214,7 +261,9 @@ export class LongRun {
     // }
     // return ret;
     // check if all the processes are completed
-    const taskCount = this.properties.getProperty(LongRun.PREFIX_OPTION_TASK_COUNT + funcName);
+    const taskCount = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TASK_COUNT + funcName
+    );
     const completedTaskIndex = this.properties.getProperty(
       LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
     );
@@ -239,15 +288,27 @@ export class LongRun {
     this.properties.deleteProperty(LongRun.PREFIX_OPTION_IS_ADDON + funcName);
     this.properties.deleteProperty(LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName);
     this.properties.deleteProperty(LongRun.PREFIX_OPTION_TASK_COUNT + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS + funcName);
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_HOURS + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_DAYS + funcName
+    );
+    this.properties.deleteProperty(
+      LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_WEEKS + funcName
+    );
 
     // delete function arguments from properties
     this.properties.deleteProperty(LongRun.PREFIX_FUNC_ARGS + funcName);
-    this.properties.deleteProperty(LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName);
+    this.properties.deleteProperty(
+      LongRun.PREFIX_TASK_COMPLETED_INDEX + funcName
+    );
     this.properties.deleteProperty(LongRun.PREFIX_RUNNING + funcName);
   }
 
@@ -256,7 +317,9 @@ export class LongRun {
    * @param funcName
    */
   isRunning(funcName: string): boolean {
-    let running: string | null = this.properties.getProperty(LongRun.PREFIX_RUNNING + funcName);
+    let running: string | null = this.properties.getProperty(
+      LongRun.PREFIX_RUNNING + funcName
+    );
     return !(running === null || running === "");
   }
 
@@ -301,10 +364,18 @@ export class LongRun {
     // } else {
     //   return [];
     // }
-    const isAddon = Boolean(this.properties.getProperty(LongRun.PREFIX_OPTION_IS_ADDON + funcName));
-    const execScope = this.properties.getProperty(LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName);
-    const taskCount = this.properties.getProperty(LongRun.PREFIX_OPTION_TASK_COUNT + funcName);
-    const maxRuntime = this.properties.getProperty(LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName);
+    const isAddon = Boolean(
+      this.properties.getProperty(LongRun.PREFIX_OPTION_IS_ADDON + funcName)
+    );
+    const execScope = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_EXEC_SCOPE + funcName
+    );
+    const taskCount = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_TASK_COUNT + funcName
+    );
+    const maxRuntime = this.properties.getProperty(
+      LongRun.PREFIX_OPTION_MAX_RUNTIME + funcName
+    );
     const triggerEveryNMinutes = this.properties.getProperty(
       LongRun.PREFIX_OPTION_TRIGGER_EVERY_N_MINS + funcName
     );
@@ -330,11 +401,14 @@ export class LongRun {
         maxRuntime: parseInt(maxRuntime),
         triggerEveryNMinutes:
           triggerEveryNMinutes === null
-            ? null
+            ? undefined
             : (parseInt(triggerEveryNMinutes) as EveryMinutesType),
-        triggerEveryNHours: triggerEveryNHours === null ? null : parseInt(triggerEveryNHours),
-        triggerEveryNDays: triggerEveryNDays === null ? null : parseInt(triggerEveryNDays),
-        triggerEveryNWeeks: triggerEveryNWeeks === null ? null : parseInt(triggerEveryNWeeks),
+        triggerEveryNHours:
+          triggerEveryNHours === null ? undefined : parseInt(triggerEveryNHours),
+        triggerEveryNDays:
+          triggerEveryNDays === null ? undefined : parseInt(triggerEveryNDays),
+        triggerEveryNWeeks:
+          triggerEveryNWeeks === null ? undefined : parseInt(triggerEveryNWeeks),
       };
     }
     return null;
@@ -346,7 +420,10 @@ export class LongRun {
    */
   setParameters(funcName: string, parameters: string[]): void {
     if (parameters != null) {
-      this.properties.setProperty(LongRun.PREFIX_OPTION + funcName, parameters.join(","));
+      this.properties.setProperty(
+        LongRun.PREFIX_OPTION + funcName,
+        parameters.join(",")
+      );
     } else {
       this.properties.deleteProperty(LongRun.PREFIX_OPTION + funcName);
     }
