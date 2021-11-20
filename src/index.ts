@@ -5,12 +5,11 @@ type ExecScopeType = "user" | "script" | "document";
 type ScriptType = "addon" | "containerBound" | "webapp";
 
 export type SetupOptions = {
-  applyV8Workaround?: boolean;
-  webappUrl?: string;
   isAddon: boolean;
   execScope: ExecScopeType;
   taskCount: number;
   maxRuntime: number;
+  triggerId?: string;
   triggerEveryNMinutes?: EveryMinutesType;
   triggerEveryNHours?: number;
   triggerEveryNDays?: number;
@@ -100,20 +99,8 @@ export class LongRun {
     let triggerId: string | null = null;
     let triggerProperties: any = null;
 
-    if (options.applyV8Workaround && options.webappUrl) {
-      const params = {
-        headers: { Authorization: `Bearer ${ScriptApp.getOAuthToken()}` },
-        followRedirects: true,
-        muteHttpExceptions: true,
-      };
-      const url = `${options.webappUrl}?fn=${funcName}`;
-      const response = UrlFetchApp.fetch(url, params).getContentText();
-      const responseJSON = JSON.parse(response);
-      if (responseJSON.status === "success") {
-        triggerId = responseJSON.triggerId;
-      } else if (responseJSON.status === "error") {
-        throw new Error(`${responseJSON.message}`);
-      }
+    if (options.triggerId) {
+      triggerId = options.triggerId;
     } else {
       const clockTriggerBuilder: GoogleAppsScript.Script.ClockTriggerBuilder =
         ScriptApp.newTrigger(funcName).timeBased();
@@ -404,11 +391,15 @@ export class LongRun {
             ? undefined
             : (parseInt(triggerEveryNMinutes) as EveryMinutesType),
         triggerEveryNHours:
-          triggerEveryNHours === null ? undefined : parseInt(triggerEveryNHours),
+          triggerEveryNHours === null
+            ? undefined
+            : parseInt(triggerEveryNHours),
         triggerEveryNDays:
           triggerEveryNDays === null ? undefined : parseInt(triggerEveryNDays),
         triggerEveryNWeeks:
-          triggerEveryNWeeks === null ? undefined : parseInt(triggerEveryNWeeks),
+          triggerEveryNWeeks === null
+            ? undefined
+            : parseInt(triggerEveryNWeeks),
       };
     }
     return null;

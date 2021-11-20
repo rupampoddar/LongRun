@@ -1,12 +1,11 @@
 declare type EveryMinutesType = 1 | 5 | 10 | 15 | 30;
 declare type ExecScopeType = "user" | "script" | "document";
 export declare type SetupOptions = {
-    applyV8Workaround?: boolean;
-    webappUrl?: string;
     isAddon: boolean;
     execScope: ExecScopeType;
     taskCount: number;
     maxRuntime: number;
+    triggerId?: string;
     triggerEveryNMinutes?: EveryMinutesType;
     triggerEveryNHours?: number;
     triggerEveryNDays?: number;
