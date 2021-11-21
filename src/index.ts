@@ -93,15 +93,15 @@ export class LongRun {
     //   this.properties = PropertiesService.getUserProperties();
     // }
 
-    // reset any previous execution
-    this.reset(funcName);
-
     let triggerId: string | null = null;
     let triggerProperties: any = null;
 
     if (options.triggerId) {
       triggerId = options.triggerId;
     } else {
+      // reset any previous execution
+      this.reset(funcName);
+
       const clockTriggerBuilder: GoogleAppsScript.Script.ClockTriggerBuilder =
         ScriptApp.newTrigger(funcName).timeBased();
       // add-on can use a time-driven trigger once per hour at most,
