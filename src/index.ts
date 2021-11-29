@@ -84,6 +84,9 @@ export class LongRun {
       triggerEveryNWeeks, // trigger the long-running function every n weeks
     } = options;
 
+    // update local variables
+    this.setMaxExecutionSeconds(maxRuntime)
+
     // if (execScope === 'script') {
     //   this.properties = PropertiesService.getScriptProperties();
     // } else if (execScope === 'document') {
