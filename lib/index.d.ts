@@ -109,6 +109,7 @@ export declare class LongRun {
      * @param funcName
      */
     getSetupOptions(funcName: string): SetupOptions | null;
+    getArgs(funcName: string): any;
     /**
      * Sets the function parameters.
      * @param funcName

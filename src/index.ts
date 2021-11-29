@@ -2,7 +2,6 @@ import Properties = GoogleAppsScript.Properties.Properties;
 
 type EveryMinutesType = 1 | 5 | 10 | 15 | 30;
 type ExecScopeType = "user" | "script" | "document";
-type ScriptType = "addon" | "containerBound" | "webapp";
 
 export type SetupOptions = {
   isAddon: boolean;
@@ -401,6 +400,16 @@ export class LongRun {
             ? undefined
             : parseInt(triggerEveryNWeeks),
       };
+    }
+    return null;
+  }
+
+  getArgs(funcName: string) {
+    const funcArgs = this.properties.getProperty(
+      LongRun.PREFIX_FUNC_ARGS + funcName
+    );
+    if (funcArgs) {
+      return JSON.parse(funcArgs);
     }
     return null;
   }
